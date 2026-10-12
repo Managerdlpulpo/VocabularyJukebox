@@ -42,7 +42,11 @@
             color: var(--neon-pink);
             font-size: 1.1rem;
             font-weight: bold;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
         }
+        .stats-bar.holding { box-shadow: 0 0 12px var(--retro-gold); }
         .nav-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -195,14 +199,13 @@
 <body>
 
 <div id="jukebox-container">
-    <div class="stats-bar">
+    <div class="stats-bar" id="stats-bar" title="Mantén pulsado para ajustes">
         <span>SCORE: <span id="score-val">0</span></span>
         <span id="vocab-count">0 palabras</span>
     </div>
     
     <div class="nav-tabs">
-        <button class="nav-btn active" onclick="showTab('setup', this)">SETUP</button>
-        <button class="nav-btn" onclick="showTab('learn', this)">STUDY</button>
+        <button class="nav-btn active" onclick="showTab('learn', this)">STUDY</button>
         <button class="nav-btn" onclick="showTab('scramble', this)">SPELL</button>
         <button class="nav-btn" onclick="showTab('sound', this)">LISTEN</button>
         <button class="nav-btn" onclick="showTab('speak', this)">SPEAK</button>
@@ -210,8 +213,9 @@
 
     <div class="screen">
         <!-- SETUP -->
-        <div id="tab-setup" class="game-section active">
+        <div id="tab-setup" class="game-section">
             <h3 style="color: var(--retro-gold); margin-top:0;">Añade tus conceptos</h3>
+            <button class="btn-control" onclick="closeSetup()" style="margin-bottom:12px;">Cerrar ajustes</button>
             <div class="setup-form">
                 <input id="new-word" placeholder="Palabra en inglés (ej: Bed)" style="width:42%;" oninput="autoSuggestEmoji()">
                 <input id="new-emoji" placeholder="Emoji o URL de imagen" style="width:25%;">
@@ -232,7 +236,7 @@
         </div>
 
         <!-- STUDY -->
-        <div id="tab-learn" class="game-section">
+        <div id="tab-learn" class="game-section active">
             <div id="learn-list"></div>
             <div class="controls">
                 <button class="btn-control" onclick="renderStudy()">Refrescar</button>
@@ -427,7 +431,7 @@
 
     function showTab(id, btn) {
         if (vocab.length === 0 && id !== 'setup') {
-            alert('Primero añade al menos una palabra en SETUP');
+            alert('Todavía no hay palabras. Mantén pulsada la barra de puntuación para abrir los ajustes.');
             return;
         }
         activeTab = id;
@@ -443,6 +447,19 @@
             requestMicPermissionOnce();
         }
         if (id === 'setup') renderVocabList();
+    }
+
+    function closeSetup() {
+        const studyBtn = document.querySelector('.nav-btn');
+        showTab('learn', studyBtn);
+    }
+
+    function openSetup() {
+        activeTab = 'setup';
+        document.querySelectorAll('.game-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-setup').classList.add('active');
+        renderVocabList();
     }
 
     // --- SETUP ---
@@ -681,6 +698,32 @@
     updateVocabCount();
     document.getElementById('score-val').innerText = score;
     renderVocabList();
+    if (vocab.length) renderStudy();
+
+    // Ajustes ocultos: mantener pulsada la barra de puntuación ~1,2 s
+    (function bindHiddenSetup() {
+        const bar = document.getElementById('stats-bar');
+        let holdTimer = null;
+        const arm = () => {
+            bar.classList.add('holding');
+            holdTimer = setTimeout(() => {
+                holdTimer = null;
+                bar.classList.remove('holding');
+                openSetup();
+            }, 1200);
+        };
+        const cancel = () => {
+            if (holdTimer) clearTimeout(holdTimer);
+            holdTimer = null;
+            bar.classList.remove('holding');
+        };
+        bar.addEventListener('mousedown', arm);
+        bar.addEventListener('mouseup', cancel);
+        bar.addEventListener('mouseleave', cancel);
+        bar.addEventListener('touchstart', (e) => { e.preventDefault(); arm(); }, { passive: false });
+        bar.addEventListener('touchend', cancel);
+        bar.addEventListener('touchcancel', cancel);
+    })();
 
     // Pedir permiso de micrófono una sola vez al cargar la página
     window.addEventListener('load', () => {
